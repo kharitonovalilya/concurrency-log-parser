@@ -19,7 +19,7 @@ public class Statistics {
     private final Map<Integer, Integer> statusCounts = new HashMap<>();
     private final Map<String, Integer> pathCounts = new HashMap<>();
 
-    public void update(LogEntry log) {
+    public synchronized void update(LogEntry log) {
         totalRequests++;
         if (log.statusCode() >= ERROR_STATUS_THRESHOLD) {
             errorRequests++;

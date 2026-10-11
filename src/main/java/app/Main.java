@@ -1,6 +1,6 @@
 package app;
 
-import analyzer.LogAnalyzer;
+import analyzer.SingleThreadLogAnalyzer;
 import parser.LogParser;
 import statistics.Statistics;
 
@@ -10,9 +10,9 @@ import java.nio.file.Path;
 public class Main {
     static void main() throws IOException {
         LogParser logParser = new LogParser();
-        LogAnalyzer logAnalyzer = new LogAnalyzer(logParser);
+        SingleThreadLogAnalyzer singleThreadLogAnalyzer = new SingleThreadLogAnalyzer(logParser);
 
-        Statistics statistics = logAnalyzer.analyze(Path.of("logs.txt"));
+        Statistics statistics = singleThreadLogAnalyzer.analyze(Path.of("logs.txt"));
 
         System.out.println("Total requests: " + statistics.getTotalRequests());
         System.out.println("Errors: " + statistics.getErrorRequests());
