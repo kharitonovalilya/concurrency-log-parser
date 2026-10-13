@@ -1,17 +1,22 @@
 package benchmark;
 
-import analyzer.ConcurrentLogAnalyzer;
-import analyzer.LogAnalyzer;
-import analyzer.SingleThreadLogAnalyzer;
-import parser.LogParser;
+import config.HttpMethod;
+import model.LogEntry;
 import statistics.ConcurrentStatistics;
+import statistics.Statistics;
+import statistics.StatisticsCollector;
 import statistics.SynchronizedStatistics;
 
-import java.io.IOException;
-import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
+// TODO: use JMH for a more precise benchmark
 public class Benchmark {
 
     private static final int WARMUP_RUNS = 3;
@@ -20,74 +25,189 @@ public class Benchmark {
 
     private record BenchmarkCase(
             String name,
-            LogAnalyzer analyzer
-    ) {}
+            Supplier<StatisticsCollector> statisticsFactory,
+            int workerCount
+    ) {
+    }
 
-    static void main(String[] args) throws Exception {
-        Path path = Path.of("benchmark-logs.txt");
-        LogGenerator.generate(path, LOG_COUNT);
+   static void main(String[] args) throws Exception {
+        List<LogEntry> logs = generateLogs(LOG_COUNT);
+
         List<BenchmarkCase> cases = List.of(
                 new BenchmarkCase(
-                        "Sequential",
-                        new SingleThreadLogAnalyzer(new LogParser())
-                ),
-                new BenchmarkCase(
-                        "Synchronized, 1 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, SynchronizedStatistics::new)
+                        "Synchronized, 1 worker",
+                        SynchronizedStatistics::new,
+                        1
                 ),
                 new BenchmarkCase(
                         "Synchronized, 2 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, SynchronizedStatistics::new)
+                        SynchronizedStatistics::new,
+                        2
                 ),
                 new BenchmarkCase(
                         "Synchronized, 4 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 4, 100, SynchronizedStatistics::new)
+                        SynchronizedStatistics::new,
+                        4
                 ),
                 new BenchmarkCase(
                         "Synchronized, 8 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 8, 100, SynchronizedStatistics::new)
+                        SynchronizedStatistics::new,
+                        8
+                ),
+
+                new BenchmarkCase(
+                        "Concurrent structures, 1 worker",
+                        ConcurrentStatistics::new,
+                        1
                 ),
                 new BenchmarkCase(
-                        "Concurrent structures, 1 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, ConcurrentStatistics::new)
-                ),
-                new BenchmarkCase(
-                        "Concurrent structurest, 2 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, ConcurrentStatistics::new)
+                        "Concurrent structures, 2 workers",
+                        ConcurrentStatistics::new,
+                        2
                 ),
                 new BenchmarkCase(
                         "Concurrent structures, 4 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 4, 100, ConcurrentStatistics::new)
+                        ConcurrentStatistics::new,
+                        4
                 ),
                 new BenchmarkCase(
                         "Concurrent structures, 8 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 8, 100, ConcurrentStatistics::new)
+                        ConcurrentStatistics::new,
+                        8
                 )
         );
-        for (BenchmarkCase benchmarkCase : cases) {
-            double averageTime = benchmark(benchmarkCase.analyzer(), path);
-            System.out.printf(
-                    "%-25s %.2f ms%n",
-                    benchmarkCase.name(),
-                    averageTime
-            );
-        }
+
+//        for (BenchmarkCase benchmarkCase : cases) {
+//            double averageTime = benchmarkStatistics(
+//                    benchmarkCase.statisticsFactory(),
+//                    logs,
+//                    benchmarkCase.workerCount()
+//            );
+//            System.out.printf(
+//                    "%-35s %.2f ms%n",
+//                    benchmarkCase.name(),
+//                    averageTime
+//            );
+//        }
+        double averageTime = benchmarkStatistics(Statistics::new, logs, 1);
+       System.out.printf(
+               "%-35s %.2f ms%n",
+               "Single-thread benchmark",
+               averageTime
+       );
     }
 
-    private static double benchmark(
-            LogAnalyzer analyzer,
-            Path path
-    ) throws IOException, ExecutionException, InterruptedException {
+    private static List<LogEntry> generateLogs(int count) {
+        List<LogEntry> logs = new ArrayList<>(count);
+        LocalDateTime timestamp =
+                LocalDateTime.of(2026, 10, 10, 10, 0);
+        for (int i = 0; i < count; i++) {
+            logs.add(new LogEntry(
+                    timestamp,
+                    HttpMethod.GET,
+                    switch (i % 5) {
+                        case 0 -> "/users";
+                        case 1 -> "/orders";
+                        case 2 -> "/friends";
+                        case 3 -> "/favorites";
+                        default -> "/products";
+                    },
+                    i % 10 == 0 ? 500 : 200,
+                    50
+            ));
+        }
+        return logs;
+    }
+
+    private static long runDirect(
+            Supplier<StatisticsCollector> statisticsFactory,
+            List<LogEntry> logs
+    ) {
+        StatisticsCollector statistics =
+                statisticsFactory.get();
+        long start = System.nanoTime();
+        for (LogEntry log : logs) {
+            statistics.update(log);
+        }
+        long end = System.nanoTime();
+        return end - start;
+    }
+
+    private static double benchmarkStatistics(
+            Supplier<StatisticsCollector> statisticsFactory,
+            List<LogEntry> logs,
+            int workerCount
+    ) throws Exception {
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            analyzer.analyze(path);
+            runDirect(statisticsFactory, logs);
         }
         long totalTime = 0;
         for (int i = 0; i < MEASURED_RUNS; i++) {
-            long start = System.nanoTime();
-            analyzer.analyze(path);
-            long end = System.nanoTime();
-            totalTime += end - start;
+            totalTime += runOnce(
+                    statisticsFactory,
+                    logs,
+                    workerCount
+            );
         }
-        return totalTime / (double) MEASURED_RUNS / 1_000_000;
+        return totalTime
+                / (double) MEASURED_RUNS
+                / 1_000_000;
+    }
+
+    private static long runOnce(
+            Supplier<StatisticsCollector> statisticsFactory,
+            List<LogEntry> logs,
+            int workerCount
+    ) throws Exception {
+        StatisticsCollector statistics =
+                statisticsFactory.get();
+        ExecutorService executor =
+                Executors.newFixedThreadPool(workerCount);
+        try {
+            int chunkSize = logs.size() / workerCount;
+            List<Future<?>> futures = new ArrayList<>();
+            CountDownLatch runLatch = new CountDownLatch(workerCount);
+            CountDownLatch startLatch = new CountDownLatch(1);
+            for (int worker = 0; worker < workerCount; worker++) {
+                int from = worker * chunkSize;
+                int to = worker == workerCount - 1
+                        ? logs.size()
+                        : from + chunkSize;
+                futures.add(executor.submit(() -> {
+                    runLatch.countDown();
+                    try {
+                        startLatch.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                    for (int i = from; i < to; i++) {
+                        statistics.update(logs.get(i));
+                    }
+                }));
+            }
+            runLatch.await();
+
+            long start = System.nanoTime();
+
+            startLatch.countDown();
+            for (Future<?> future : futures) {
+                future.get();
+            }
+
+            long end = System.nanoTime();
+
+            if (statistics.getTotalRequests() != logs.size()) {
+                throw new IllegalStateException(
+                        "Expected " + logs.size()
+                                + " requests, but got "
+                                + statistics.getTotalRequests()
+                );
+            }
+
+            return end - start;
+        } finally {
+            executor.shutdown();
+        }
     }
 }

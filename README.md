@@ -58,7 +58,7 @@ The concurrent analyzer is tested on a generated file containing many
 log entries to verify that no requests are lost when several workers
 process logs simultaneously.
 
-## Experiments
+# Experiments
 
 Large log files are generated automatically using `LogGenerator`.
 
@@ -167,3 +167,51 @@ This suggests that statistics synchronization is not the main bottleneck
 of the application. File reading, parsing, `BlockingQueue` coordination
 and other parts of the processing pipeline also contribute significantly
 to the total execution time.
+
+### Experiment 3: isolated statistics contention
+
+The end-to-end benchmark showed almost no performance difference between
+the synchronized statistics implementation and the implementation based on
+concurrent data structures. This suggested that statistics updates might not
+be the main bottleneck of the complete log-processing pipeline.
+
+To isolate the synchronization strategy itself, a separate benchmark was
+created. One million `LogEntry` objects were generated before the measurement,
+so file I/O, string parsing and `BlockingQueue` coordination were excluded.
+
+`CountDownLatch` was used to make sure that all worker threads had already
+started before the measurement began. The workers waited on a common start
+latch and were released only after the timer was started.
+
+| Implementation | Workers | Average time |
+|---|---:|---:|
+| Sequential | 1 | 23.12 ms |
+| Synchronized | 1 | 21.32 ms |
+| Synchronized | 2 | 46.89 ms |
+| Synchronized | 4 | 100.18 ms |
+| Synchronized | 8 | 126.40 ms |
+| Concurrent structures | 1 | 12.50 ms |
+| Concurrent structures | 2 | 20.57 ms |
+| Concurrent structures | 4 | 32.84 ms |
+| Concurrent structures | 8 | 63.45 ms |
+
+The isolated benchmark shows a much clearer difference between the two
+thread-safe implementations.
+
+With `SynchronizedStatistics`, the whole `update()` operation is protected
+by one monitor. Therefore, even when several worker threads are available,
+only one of them can update the shared statistics at a time. As the number
+of competing threads increases, lock contention grows and performance
+degrades significantly.
+
+`ConcurrentStatistics` uses `LongAdder`, `AtomicLong` and
+`ConcurrentHashMap` instead of one coarse-grained lock. The workers still
+access shared state and synchronization overhead does not disappear, but
+they are no longer forced to serialize the entire update operation. This
+allows the implementation to handle contention considerably better.
+
+Optimizing shared statistics does improve the statistics subsystem itself, but this improvement
+has only a small effect on the complete application because file reading,
+parsing, queue coordination and other stages also contribute to the total
+processing time.
+
