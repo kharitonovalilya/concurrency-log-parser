@@ -1,7 +1,6 @@
 # Concurrent Log Analyzer
 
-A Java application for analyzing HTTP access logs and comparing sequential
-and concurrent processing approaches.
+A Java application for analyzing HTTP access logs and provide some experiments of compares different methods to reach thread-safe concurrency.
 
 The project was created to practice Java concurrency concepts such as
 thread pools, blocking queues, synchronization, shared mutable state,
@@ -59,10 +58,6 @@ The concurrent analyzer is tested on a generated file containing many
 log entries to verify that no requests are lost when several workers
 process logs simultaneously.
 
-Synchronization can be removed from `Statistics.update()` and it clearly demonstrates a race
-condition, because multiple workers may overwrite each other's updates and
-produce incorrect results.
-
 ## Experiments
 
 Large log files are generated automatically using `LogGenerator`.
@@ -75,7 +70,7 @@ Each implementation is executed several times:
 
 The measurements currently include thread-pool creation and shutdown.
 
-## First performance experiment
+## Experiment 1: compare single-thread and concurrent
 
 ### Concurrent analyzer
 
@@ -113,20 +108,7 @@ for each worker so that all workers can terminate.
 `Statistics` is shared between multiple worker threads.
 
 The first concurrent implementation protects the whole update operation
-with `synchronized`:
-
-```java
-public synchronized void update(LogEntry log) {
-    ...
-}
-```
-
-This one compares:
-
-- sequential processing;
-- concurrent processing with 2 workers;
-- concurrent processing with 4 workers;
-- concurrent processing with 8 workers.
+with `synchronized`.
 
 ## Benchmark results
 
@@ -146,3 +128,42 @@ synchronizes the entire statistics update operation, so only one worker can
 modify the statistics at a time. With more workers, lock contention, queue
 coordination and thread scheduling overhead start to outweigh the benefits
 of additional parallelism.
+
+## Experiment 2: synchronized vs concurrent data structures
+
+The second implementation replaces:
+
+- `LongAdder` for request counters and total response time;
+- `AtomicLong` for maximum response time;
+- `ConcurrentHashMap<K, LongAdder>` for grouped counters.
+
+## Benchmark results
+
+| Implementation | Workers | Average time |
+|---|---:|---:|
+| Sequential | 1 | 643.31 ms |
+| Synchronized | 1 | 486.78 ms |
+| Synchronized | 2 | 496.73 ms |
+| Synchronized | 4 | 396.48 ms |
+| Synchronized | 8 | 478.49 ms |
+| Concurrent structures | 1 | 512.87 ms |
+| Concurrent structures | 2 | 509.69 ms |
+| Concurrent structures | 4 | 402.81 ms |
+| Concurrent structures | 8 | 470.81 ms |
+
+The best result in both concurrent implementations was achieved with
+4 worker threads, as in first.
+
+Consequently, additional threads introduce scheduling, queue coordination and contention
+over shared state, so increasing parallelism does not necessarily improve
+performance.
+
+Replacing the single synchronized update with concurrent
+data structures did not produce a significant improvement.
+For example, with 4 workers the synchronized version took 396.48 ms,
+whereas the concurrent-structures version took 402.81 ms.
+
+This suggests that statistics synchronization is not the main bottleneck
+of the application. File reading, parsing, `BlockingQueue` coordination
+and other parts of the processing pipeline also contribute significantly
+to the total execution time.

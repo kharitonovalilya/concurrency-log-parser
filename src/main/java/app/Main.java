@@ -2,7 +2,7 @@ package app;
 
 import analyzer.SingleThreadLogAnalyzer;
 import parser.LogParser;
-import statistics.Statistics;
+import statistics.StatisticsCollector;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -12,7 +12,7 @@ public class Main {
         LogParser logParser = new LogParser();
         SingleThreadLogAnalyzer singleThreadLogAnalyzer = new SingleThreadLogAnalyzer(logParser);
 
-        Statistics statistics = singleThreadLogAnalyzer.analyze(Path.of("logs.txt"));
+        StatisticsCollector statistics = singleThreadLogAnalyzer.analyze(Path.of("logs.txt"));
 
         System.out.println("Total requests: " + statistics.getTotalRequests());
         System.out.println("Errors: " + statistics.getErrorRequests());

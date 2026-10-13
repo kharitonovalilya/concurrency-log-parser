@@ -3,6 +3,7 @@ package analyzer;
 import model.LogEntry;
 import parser.LogParser;
 import statistics.Statistics;
+import statistics.StatisticsCollector;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -18,8 +19,8 @@ public class SingleThreadLogAnalyzer implements LogAnalyzer {
     }
 
     @Override
-    public Statistics analyze(Path path) throws IOException {
-        Statistics statistics = new Statistics();
+    public StatisticsCollector analyze(Path path) throws IOException {
+        StatisticsCollector statistics = new Statistics();
         try (BufferedReader reader = Files.newBufferedReader(path)) {
             String line;
             while ((line = reader.readLine()) != null) {

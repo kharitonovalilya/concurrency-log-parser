@@ -1,9 +1,9 @@
 import analyzer.ConcurrentLogAnalyzer;
-import analyzer.SingleThreadLogAnalyzer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import parser.LogParser;
-import statistics.Statistics;
+import statistics.ConcurrentStatistics;
+import statistics.StatisticsCollector;
 
 import java.io.BufferedWriter;
 import java.nio.file.Files;
@@ -36,9 +36,9 @@ public class LogAnalyzerConcurrencyTest {
         LogParser parser = new LogParser();
 
         ConcurrentLogAnalyzer analyzer =
-                new ConcurrentLogAnalyzer(parser, 10, 100);
+                new ConcurrentLogAnalyzer(parser, 10, 100, ConcurrentStatistics::new);
 
-        Statistics statistics = analyzer.analyze(logFile);
+        StatisticsCollector statistics = analyzer.analyze(logFile);
 
         assertEquals(
                 logsCount,

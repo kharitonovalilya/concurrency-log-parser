@@ -4,6 +4,8 @@ import analyzer.ConcurrentLogAnalyzer;
 import analyzer.LogAnalyzer;
 import analyzer.SingleThreadLogAnalyzer;
 import parser.LogParser;
+import statistics.ConcurrentStatistics;
+import statistics.SynchronizedStatistics;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,16 +32,36 @@ public class Benchmark {
                         new SingleThreadLogAnalyzer(new LogParser())
                 ),
                 new BenchmarkCase(
-                        "Concurrent, 2 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100)
+                        "Synchronized, 1 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, SynchronizedStatistics::new)
                 ),
                 new BenchmarkCase(
-                        "Concurrent, 4 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 4, 100)
+                        "Synchronized, 2 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, SynchronizedStatistics::new)
                 ),
                 new BenchmarkCase(
-                        "Concurrent, 8 workers",
-                        new ConcurrentLogAnalyzer(new LogParser(), 8, 100)
+                        "Synchronized, 4 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 4, 100, SynchronizedStatistics::new)
+                ),
+                new BenchmarkCase(
+                        "Synchronized, 8 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 8, 100, SynchronizedStatistics::new)
+                ),
+                new BenchmarkCase(
+                        "Concurrent structures, 1 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, ConcurrentStatistics::new)
+                ),
+                new BenchmarkCase(
+                        "Concurrent structurest, 2 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 2, 100, ConcurrentStatistics::new)
+                ),
+                new BenchmarkCase(
+                        "Concurrent structures, 4 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 4, 100, ConcurrentStatistics::new)
+                ),
+                new BenchmarkCase(
+                        "Concurrent structures, 8 workers",
+                        new ConcurrentLogAnalyzer(new LogParser(), 8, 100, ConcurrentStatistics::new)
                 )
         );
         for (BenchmarkCase benchmarkCase : cases) {

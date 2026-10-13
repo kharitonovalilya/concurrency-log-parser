@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Getter
-public class Statistics {
+public class Statistics implements StatisticsCollector {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
     private long totalRequests;
@@ -19,7 +19,8 @@ public class Statistics {
     private final Map<Integer, Integer> statusCounts = new HashMap<>();
     private final Map<String, Integer> pathCounts = new HashMap<>();
 
-    public synchronized void update(LogEntry log) {
+    @Override
+    public void update(LogEntry log) {
         totalRequests++;
         if (log.statusCode() >= ERROR_STATUS_THRESHOLD) {
             errorRequests++;
