@@ -22,7 +22,14 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
 
     private final Supplier<StatisticsCollector> statisticsFactory;
 
-    private record QueueItem(String line, boolean stop) {}
+    private record QueueItem(String line, boolean flag) {
+        static QueueItem log(String line) {
+            return new QueueItem(line, false);
+        }
+        static QueueItem stop() {
+            return new QueueItem(null, true);
+        }
+    }
 
     public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<StatisticsCollector> statisticsFactory) {
         this.logParser = logParser;
@@ -34,7 +41,7 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
     private void processLogs(BlockingQueue<QueueItem> logQueue, StatisticsCollector statistics) throws InterruptedException{
         while (true) {
             QueueItem queueItem = logQueue.take();
-            if (queueItem.stop()) {
+            if (queueItem.flag()) {
                 break;
             }
             LogEntry log = logParser.parse(queueItem.line());
@@ -69,11 +76,11 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
             try (BufferedReader reader = Files.newBufferedReader(path)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    logQueue.put(new QueueItem(line, false));
+                    logQueue.put(QueueItem.log(line));
                 }
             }
             for (int i = 0; i < workerCount; i++) {
-                logQueue.put(new QueueItem("STOP", true));
+                logQueue.put(QueueItem.stop());
             }
             for (Future<?> future : futures) {
                 future.get();

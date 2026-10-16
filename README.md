@@ -1,10 +1,25 @@
 # Concurrent Log Analyzer
 
-A Java application for analyzing HTTP access logs and provide some experiments of compares different methods to reach thread-safe concurrency.
+A Java application for analyzing HTTP access logs and experimenting with
+different approaches to thread-safe concurrent processing.
 
 The project was created to practice Java concurrency concepts such as
 thread pools, blocking queues, synchronization, shared mutable state,
 and producer-consumer architecture.
+
+## Contents
+
+- [Log format](#log-format)
+- [Collected statistics](#collected-statistics)
+- [Sequential implementation](#sequential-implementation)
+- [Testing](#testing)
+- [Failure handling](#failure-handling)
+- [Experiments](#experiments)
+    - [Experiment 1: single-thread vs concurrent processing](#experiment-1-single-thread-vs-concurrent-processing)
+    - [Experiment 2: synchronized vs concurrent data structures](#experiment-2-synchronized-vs-concurrent-data-structures)
+    - [Experiment 3: isolated statistics contention](#experiment-3-isolated-statistics-contention)
+- [Key findings](#key-findings)
+- [Limitations](#limitations)
 
 ## Log format
 
@@ -31,7 +46,7 @@ The analyzer calculates:
 - average response time;
 - max response time.
 
-## Base implementation
+## Sequential implementation
 
 Processes the log file in a single thread:
 
@@ -58,6 +73,27 @@ The concurrent analyzer is tested on a generated file containing many
 log entries to verify that no requests are lost when several workers
 process logs simultaneously.
 
+## Failure handling
+
+The concurrent analyzer follows a fail-fast strategy.
+
+If a worker fails while parsing or processing a log entry, the failure is
+stored and the producer thread is interrupted. The remaining worker tasks
+are then cancelled through executor shutdown.
+
+This prevents the producer from blocking indefinitely on a full bounded
+queue when one or more consumers have already failed.
+
+Normal completion and failure use different shutdown strategies:
+
+- successful processing finishes workers using explicit stop signals and
+  performs a graceful executor shutdown;
+- failed or externally interrupted processing uses `shutdownNow()` to
+  interrupt remaining worker tasks.
+
+Queue control messages are represented separately from log contents, so
+a log line cannot accidentally be interpreted as a worker stop signal.
+
 # Experiments
 
 Large log files are generated automatically using `LogGenerator`.
@@ -68,8 +104,12 @@ Each implementation is executed several times:
 - multiple measured runs are performed;
 - the average execution time is calculated using `System.nanoTime()`.
 
-The measurements currently include thread-pool creation and shutdown.
+The end-to-end benchmarks include the complete analyzer lifecycle,
+including thread-pool creation and shutdown.
 
+The isolated statistics benchmark starts measurement only after all worker
+threads are ready, in order to focus more closely on contention during
+statistics updates.
 ## Experiment 1: compare single-thread and concurrent
 
 ### Concurrent analyzer
@@ -77,7 +117,7 @@ The measurements currently include thread-pool creation and shutdown.
 The concurrent implementation uses a producer-consumer approach.
 
 ```text
-                BlockingQueue<String>
+                BlockingQueue<QueueItem>
                        │
 Producer               │
 reads file ───────────► │
@@ -100,8 +140,8 @@ Worker tasks are executed by a fixed thread pool. Each worker repeatedly:
 2. parses it into a `LogEntry`;
 3. updates shared statistics.
 
-After the whole file has been read, the producer adds one stop-flag
-for each worker so that all workers can terminate.
+After the whole file has been read, the producer adds one stop signal
+for each worker so that all workers can terminate gracefully.
 
 ## Synchronization
 
@@ -112,14 +152,14 @@ with `synchronized`.
 
 ## Benchmark results
 
-The benchmark was run on a generated log file containing 1,000,000 log.
+The benchmark was run on a generated log file containing 1,000,000 log entries.
 
 | Implementation | Workers | Average time |
 |---|---:|-------------:|
-| Sequential | 1 |       606,03 |
-| Synchronized concurrent | 2 |       472,17 |
-| Synchronized concurrent | 4 |       420,52 |
-| Synchronized concurrent | 8 |       495,30 |
+| Sequential | 1 |    606.03 ms |
+| Synchronized concurrent | 2 |    472.17 ms |
+| Synchronized concurrent | 4 |    420.52 ms |
+| Synchronized concurrent | 8 |    495.30 ms |
 
 The 4-worker configuration produced the best result in this experiment.
 
@@ -131,7 +171,7 @@ of additional parallelism.
 
 ## Experiment 2: synchronized vs concurrent data structures
 
-The second implementation replaces:
+The second implementation replaces the single coarse-grained lock with:
 
 - `LongAdder` for request counters and total response time;
 - `AtomicLong` for maximum response time;
@@ -152,7 +192,7 @@ The second implementation replaces:
 | Concurrent structures | 8 | 470.81 ms |
 
 The best result in both concurrent implementations was achieved with
-4 worker threads, as in first.
+4 worker threads, which is consistent with the first experiment.
 
 Consequently, additional threads introduce scheduling, queue coordination and contention
 over shared state, so increasing parallelism does not necessarily improve
@@ -168,7 +208,7 @@ of the application. File reading, parsing, `BlockingQueue` coordination
 and other parts of the processing pipeline also contribute significantly
 to the total execution time.
 
-### Experiment 3: isolated statistics contention
+## Experiment 3: isolated statistics contention
 
 The end-to-end benchmark showed almost no performance difference between
 the synchronized statistics implementation and the implementation based on
@@ -215,3 +255,27 @@ has only a small effect on the complete application because file reading,
 parsing, queue coordination and other stages also contribute to the total
 processing time.
 
+# Key findings
+
+The experiments demonstrated that adding more threads does not automatically
+make an application faster.
+
+In the end-to-end log-processing benchmark, performance improved as the
+number of workers increased up to four threads. Increasing the worker count
+further made processing slower because coordination and scheduling.
+
+Replacing one `synchronized` statistics update with
+`LongAdder`, `AtomicLong` and `ConcurrentHashMap` did not significantly
+improve the performance of the complete processing pipeline.
+
+However, after isolating statistics updates from file I/O, parsing and queue
+coordination, the concurrent data-structure implementation handled contention
+considerably better than the synchronized implementation.
+
+This demonstrates that optimizing one concurrent subsystem does not necessarily improve the overall application
+if that subsystem is not the main bottleneck.
+
+The project also showed the importance of correct failure handling in
+producer-consumer systems. Worker failures must be propagated to the producer
+and remaining tasks must be cancelled to avoid blocked threads and unfinished
+processing.

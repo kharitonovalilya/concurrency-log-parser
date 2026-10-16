@@ -17,7 +17,7 @@ import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 // TODO: use JMH for a more precise benchmark
-public class Benchmark {
+public class StatisticsBenchmark {
 
     private static final int WARMUP_RUNS = 3;
     private static final int MEASURED_RUNS = 5;
@@ -30,7 +30,7 @@ public class Benchmark {
     ) {
     }
 
-   static void main(String[] args) throws Exception {
+    static void main(String[] args) throws Exception {
         List<LogEntry> logs = generateLogs(LOG_COUNT);
 
         List<BenchmarkCase> cases = List.of(
@@ -90,11 +90,11 @@ public class Benchmark {
 //            );
 //        }
         double averageTime = benchmarkStatistics(Statistics::new, logs, 1);
-       System.out.printf(
-               "%-35s %.2f ms%n",
-               "Single-thread benchmark",
-               averageTime
-       );
+        System.out.printf(
+                "%-35s %.2f ms%n",
+                "Single-thread benchmark",
+                averageTime
+        );
     }
 
     private static List<LogEntry> generateLogs(int count) {
