@@ -33,6 +33,17 @@ public class StatisticsBenchmark {
     static void main(String[] args) throws Exception {
         List<LogEntry> logs = generateLogs(LOG_COUNT);
 
+        double directTime = benchmarkDirect(
+                Statistics::new,
+                logs
+        );
+
+        System.out.printf(
+                "%-35s %.2f ms%n",
+                "Plain single-thread baseline",
+                directTime
+        );
+
         List<BenchmarkCase> cases = List.of(
                 new BenchmarkCase(
                         "Synchronized, 1 worker",
@@ -77,24 +88,19 @@ public class StatisticsBenchmark {
                 )
         );
 
-//        for (BenchmarkCase benchmarkCase : cases) {
-//            double averageTime = benchmarkStatistics(
-//                    benchmarkCase.statisticsFactory(),
-//                    logs,
-//                    benchmarkCase.workerCount()
-//            );
-//            System.out.printf(
-//                    "%-35s %.2f ms%n",
-//                    benchmarkCase.name(),
-//                    averageTime
-//            );
-//        }
-        double averageTime = benchmarkStatistics(Statistics::new, logs, 1);
-        System.out.printf(
-                "%-35s %.2f ms%n",
-                "Single-thread benchmark",
-                averageTime
-        );
+        for (BenchmarkCase benchmarkCase : cases) {
+            double averageTime = benchmarkConcurrent(
+                    benchmarkCase.statisticsFactory(),
+                    logs,
+                    benchmarkCase.workerCount()
+            );
+
+            System.out.printf(
+                    "%-35s %.2f ms%n",
+                    benchmarkCase.name(),
+                    averageTime
+            );
+        }
     }
 
     private static List<LogEntry> generateLogs(int count) {
@@ -133,15 +139,41 @@ public class StatisticsBenchmark {
         return end - start;
     }
 
-    private static double benchmarkStatistics(
+    private static double benchmarkDirect(
+            Supplier<StatisticsCollector> statisticsFactory,
+            List<LogEntry> logs
+    ) {
+        for (int i = 0; i < WARMUP_RUNS; i++) {
+            runDirect(statisticsFactory, logs);
+        }
+
+        long totalTime = 0;
+
+        for (int i = 0; i < MEASURED_RUNS; i++) {
+            totalTime += runDirect(statisticsFactory, logs);
+        }
+
+        return totalTime
+                / (double) MEASURED_RUNS
+                / 1_000_000;
+    }
+
+    private static double benchmarkConcurrent(
             Supplier<StatisticsCollector> statisticsFactory,
             List<LogEntry> logs,
             int workerCount
     ) throws Exception {
+
         for (int i = 0; i < WARMUP_RUNS; i++) {
-            runDirect(statisticsFactory, logs);
+            runOnce(
+                    statisticsFactory,
+                    logs,
+                    workerCount
+            );
         }
+
         long totalTime = 0;
+
         for (int i = 0; i < MEASURED_RUNS; i++) {
             totalTime += runOnce(
                     statisticsFactory,
@@ -149,6 +181,7 @@ public class StatisticsBenchmark {
                     workerCount
             );
         }
+
         return totalTime
                 / (double) MEASURED_RUNS
                 / 1_000_000;

@@ -15,11 +15,10 @@ and producer-consumer architecture.
 - [Testing](#testing)
 - [Failure handling](#failure-handling)
 - [Experiments](#experiments)
-    - [Experiment 1: single-thread vs concurrent processing](#experiment-1-single-thread-vs-concurrent-processing)
+    - [Experiment 1: comparing single-thread and concurrent](#experiment-1-comparing-single-thread-and-concurrent)
     - [Experiment 2: synchronized vs concurrent data structures](#experiment-2-synchronized-vs-concurrent-data-structures)
     - [Experiment 3: isolated statistics contention](#experiment-3-isolated-statistics-contention)
 - [Key findings](#key-findings)
-- [Limitations](#limitations)
 
 ## Log format
 
@@ -110,7 +109,7 @@ including thread-pool creation and shutdown.
 The isolated statistics benchmark starts measurement only after all worker
 threads are ready, in order to focus more closely on contention during
 statistics updates.
-## Experiment 1: compare single-thread and concurrent
+## Experiment 1: comparing single-thread and concurrent
 
 ### Concurrent analyzer
 

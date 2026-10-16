@@ -32,6 +32,16 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
     }
 
     public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<StatisticsCollector> statisticsFactory) {
+        if (workerCount <= 0) {
+            throw new IllegalArgumentException(
+                    "workerCount must be positive"
+            );
+        }
+        if (queueCapacity <= 0) {
+            throw new IllegalArgumentException(
+                    "queueCapacity must be positive"
+            );
+        }
         this.logParser = logParser;
         this.workerCount = workerCount;
         this.queueCapacity = queueCapacity;
@@ -93,10 +103,11 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
             throw e;
         }
         finally {
-            if (!completedSuccessfully) {
+            if (completedSuccessfully) {
+                executor.shutdown();
+            } else {
                 executor.shutdownNow();
             }
-            executor.shutdown();
         }
         return statistics;
     }

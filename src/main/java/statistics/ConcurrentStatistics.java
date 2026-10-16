@@ -11,11 +11,10 @@ import java.util.stream.Collectors;
 public class ConcurrentStatistics implements StatisticsCollector {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
-    private LongAdder totalRequests = new LongAdder();
-    private LongAdder errorRequests = new LongAdder();
-    private LongAdder totalResponseTime = new LongAdder();
-
-    private AtomicLong maxResponseTime = new AtomicLong();
+    private final LongAdder totalRequests = new LongAdder();
+    private final LongAdder errorRequests = new LongAdder();
+    private final LongAdder totalResponseTime = new LongAdder();
+    private final AtomicLong maxResponseTime = new AtomicLong();
 
     private final Map<Integer, LongAdder> statusCounts = new ConcurrentHashMap<>();
     private final Map<String, LongAdder> pathCounts = new ConcurrentHashMap<>();

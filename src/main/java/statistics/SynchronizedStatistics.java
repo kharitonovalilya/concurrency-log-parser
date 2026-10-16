@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-@Getter
 public class SynchronizedStatistics implements StatisticsCollector {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
@@ -21,8 +20,7 @@ public class SynchronizedStatistics implements StatisticsCollector {
     private final Map<String, Integer> pathCounts = new HashMap<>();
 
     @Override
-    @Synchronized
-    public void update(LogEntry log) {
+    public synchronized void update(LogEntry log) {
         totalRequests++;
         if (log.statusCode() >= ERROR_STATUS_THRESHOLD) {
             errorRequests++;
@@ -34,18 +32,38 @@ public class SynchronizedStatistics implements StatisticsCollector {
         pathCounts.merge(log.path(), 1, Integer::sum);
     }
 
-    public double getAverageResponseTime() {
+    @Override
+    public synchronized long getTotalRequests() {
+        return totalRequests;
+    }
+
+    @Override
+    public synchronized long getErrorRequests() {
+        return errorRequests;
+    }
+
+    @Override
+    public synchronized long getTotalResponseTime() {
+        return totalResponseTime;
+    }
+
+    @Override
+    public synchronized long getMaxResponseTime() {
+        return maxResponseTime;
+    }
+
+    public synchronized double getAverageResponseTime() {
         if (totalRequests == 0) {
             return 0;
         }
         return (double) totalResponseTime / totalRequests;
     }
 
-    public Map<Integer, Integer> getStatusCounts() {
+    public synchronized Map<Integer, Integer> getStatusCounts() {
         return Collections.unmodifiableMap(statusCounts);
     }
 
-    public Map<String, Integer> getPathCounts() {
+    public synchronized Map<String, Integer> getPathCounts() {
         return Collections.unmodifiableMap(pathCounts);
     }
 }
