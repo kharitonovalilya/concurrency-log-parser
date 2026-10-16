@@ -2,8 +2,6 @@ package analyzer;
 
 import model.LogEntry;
 import parser.LogParser;
-import statistics.ConcurrentStatistics;
-import statistics.Statistics;
 import statistics.StatisticsCollector;
 
 import java.io.BufferedReader;
@@ -20,10 +18,11 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
 
     private final LogParser logParser;
     private final int workerCount;
-    private static final String STOP = "STOP";
     private final int queueCapacity;
 
     private final Supplier<StatisticsCollector> statisticsFactory;
+
+    private record QueueItem(String line, boolean stop) {}
 
     public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<StatisticsCollector> statisticsFactory) {
         this.logParser = logParser;
@@ -32,20 +31,20 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
         this.statisticsFactory = statisticsFactory;
     }
 
-    private void processLogs(BlockingQueue<String> logQueue, StatisticsCollector statistics) throws InterruptedException{
+    private void processLogs(BlockingQueue<QueueItem> logQueue, StatisticsCollector statistics) throws InterruptedException{
         while (true) {
-            String line = logQueue.take();
-            if (line.equals(STOP)) {
+            QueueItem queueItem = logQueue.take();
+            if (queueItem.stop()) {
                 break;
             }
-            LogEntry log = logParser.parse(line);
+            LogEntry log = logParser.parse(queueItem.line());
             statistics.update(log);
         }
     }
 
     @Override
     public StatisticsCollector analyze(Path path) throws IOException, InterruptedException, ExecutionException {
-        BlockingQueue<String> logQueue = new ArrayBlockingQueue<>(queueCapacity);
+        BlockingQueue<QueueItem> logQueue = new ArrayBlockingQueue<>(queueCapacity);
         StatisticsCollector statistics = statisticsFactory.get();
         ExecutorService executor = Executors.newFixedThreadPool(workerCount);
         AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -70,11 +69,11 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
             try (BufferedReader reader = Files.newBufferedReader(path)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    logQueue.put(line);
+                    logQueue.put(new QueueItem(line, false));
                 }
             }
             for (int i = 0; i < workerCount; i++) {
-                logQueue.put(STOP);
+                logQueue.put(new QueueItem("STOP", true));
             }
             for (Future<?> future : futures) {
                 future.get();

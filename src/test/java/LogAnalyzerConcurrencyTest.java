@@ -1,15 +1,19 @@
 import analyzer.ConcurrentLogAnalyzer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import parser.LogParser;
 import statistics.ConcurrentStatistics;
 import statistics.StatisticsCollector;
 
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class LogAnalyzerConcurrencyTest {
 
@@ -63,6 +67,37 @@ public class LogAnalyzerConcurrencyTest {
         assertEquals(
                 50,
                 statistics.getMaxResponseTime()
+        );
+    }
+
+    @Test
+    @Timeout(2)
+    void shouldFailFastWhenWorkerCannotParseLog() throws IOException {
+        Path logFile = tempDir.resolve("invalid-logs.txt");
+        Files.write(
+                logFile,
+                List.of(
+                        "2026-10-10T10:15:31 GET /users 200 53",
+                        "2026-10-10T10:15:32 GET /orders 200 80",
+                        "this-is-not-a-log",
+                        "2026-10-10T10:15:34 GET /products 200 30"
+                )
+        );
+        ConcurrentLogAnalyzer analyzer =
+                new ConcurrentLogAnalyzer(
+                        new LogParser(),
+                        4,
+                        2,
+                        ConcurrentStatistics::new
+                );
+        ExecutionException exception = assertThrows(
+                ExecutionException.class,
+                () -> analyzer.analyze(logFile)
+        );
+
+        assertInstanceOf(
+                IllegalArgumentException.class,
+                exception.getCause()
         );
     }
 }
