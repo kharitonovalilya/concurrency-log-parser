@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public class ConcurrentLogAnalyzer implements LogAnalyzer {
@@ -47,6 +48,9 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
         BlockingQueue<String> logQueue = new ArrayBlockingQueue<>(queueCapacity);
         StatisticsCollector statistics = statisticsFactory.get();
         ExecutorService executor = Executors.newFixedThreadPool(workerCount);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread producerThread = Thread.currentThread();
+        boolean completedSuccessfully = false;
         try {
             List<Future<?>> futures = new ArrayList<>();
             for (int i = 0; i < workerCount; i++) {
@@ -56,7 +60,8 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } catch (RuntimeException e) {
-                        e.printStackTrace();
+                        failure.compareAndSet(null, e);
+                        producerThread.interrupt();
                         throw e;
                     }
                 });
@@ -74,7 +79,17 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
             for (Future<?> future : futures) {
                 future.get();
             }
-        } finally {
+            completedSuccessfully = true;
+        } catch (InterruptedException e) {
+            if (failure.get() != null) {
+                throw new ExecutionException(failure.get());
+            }
+            throw e;
+        }
+        finally {
+            if (!completedSuccessfully) {
+                executor.shutdownNow();
+            }
             executor.shutdown();
         }
         return statistics;
