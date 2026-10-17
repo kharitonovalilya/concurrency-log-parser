@@ -59,13 +59,23 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
         }
     }
 
+    private void putOrFail(BlockingQueue<QueueItem> queue, QueueItem item, AtomicReference<Throwable> failure) throws InterruptedException, ExecutionException {
+        while (true) {
+            if (failure.get() != null) {
+                throw new ExecutionException(failure.get());
+            }
+            if (queue.offer(item, 100, TimeUnit.MILLISECONDS)) {
+                return;
+            }
+        }
+    }
+
     @Override
     public StatisticsCollector analyze(Path path) throws IOException, InterruptedException, ExecutionException {
         BlockingQueue<QueueItem> logQueue = new ArrayBlockingQueue<>(queueCapacity);
         StatisticsCollector statistics = statisticsFactory.get();
         ExecutorService executor = Executors.newFixedThreadPool(workerCount);
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        Thread producerThread = Thread.currentThread();
         boolean completedSuccessfully = false;
         try {
             List<Future<?>> futures = new ArrayList<>();
@@ -75,9 +85,8 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
                         processLogs(logQueue, statistics);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
-                    } catch (RuntimeException e) {
+                    } catch (RuntimeException | Error e) {
                         failure.compareAndSet(null, e);
-                        producerThread.interrupt();
                         throw e;
                     }
                 });
@@ -86,11 +95,11 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
             try (BufferedReader reader = Files.newBufferedReader(path)) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    logQueue.put(QueueItem.log(line));
+                    putOrFail(logQueue, QueueItem.log(line), failure);
                 }
             }
             for (int i = 0; i < workerCount; i++) {
-                logQueue.put(QueueItem.stop());
+                putOrFail(logQueue, QueueItem.stop(), failure);
             }
             for (Future<?> future : futures) {
                 future.get();

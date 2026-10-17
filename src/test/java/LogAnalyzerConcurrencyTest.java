@@ -100,4 +100,41 @@ public class LogAnalyzerConcurrencyTest {
                 exception.getCause()
         );
     }
+
+    @Test
+    @Timeout(2)
+    void workerFailureShouldNotLeakInterruptFlagToCaller() throws Exception {
+        Path logFile = tempDir.resolve("invalid-logs.txt");
+
+        Files.write(
+                logFile,
+                List.of(
+                        "2026-10-10T10:15:31 GET /users 200 53",
+                        "invalid log line",
+                        "2026-10-10T10:15:32 GET /orders 200 80"
+                )
+        );
+
+        ConcurrentLogAnalyzer analyzer =
+                new ConcurrentLogAnalyzer(
+                        new LogParser(),
+                        1,
+                        1,
+                        ConcurrentStatistics::new
+                );
+
+        assertFalse(Thread.currentThread().isInterrupted());
+
+        ExecutionException exception = assertThrows(
+                ExecutionException.class,
+                () -> analyzer.analyze(logFile)
+        );
+
+        assertInstanceOf(
+                IllegalArgumentException.class,
+                exception.getCause()
+        );
+
+        assertFalse(Thread.currentThread().isInterrupted());
+    }
 }
