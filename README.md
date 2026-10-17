@@ -14,10 +14,11 @@ and producer-consumer architecture.
 - [Sequential implementation](#sequential-implementation)
 - [Testing](#testing)
 - [Failure handling](#failure-handling)
+- [Running the application](#running-the-application)
 - [Experiments](#experiments)
-    - [Experiment 1: comparing single-thread and concurrent](#experiment-1-comparing-single-thread-and-concurrent)
-    - [Experiment 2: synchronized vs concurrent data structures](#experiment-2-synchronized-vs-concurrent-data-structures)
-    - [Experiment 3: isolated statistics contention](#experiment-3-isolated-statistics-contention)
+  - [Experiment 1: comparing single-thread and concurrent](#experiment-1-comparing-single-thread-and-concurrent)
+  - [Experiment 2: synchronized vs concurrent data structures](#experiment-2-synchronized-vs-concurrent-data-structures)
+  - [Experiment 3: isolated statistics contention](#experiment-3-isolated-statistics-contention)
 - [Key findings](#key-findings)
 
 ## Log format
@@ -93,6 +94,53 @@ Normal completion and failure use different shutdown strategies:
 Queue control messages are represented separately from log contents, so
 a log line cannot accidentally be interpreted as a worker stop signal.
 
+## Running the application
+
+Build the project with Maven:
+
+```bash
+mvn clean package
+```
+
+The analyzer can be launched in three modes.
+
+### Sequential processing
+
+```bash
+java -cp target/classes app.Main logs.txt sequential
+```
+
+### Concurrent processing with synchronized statistics
+
+```bash
+java -cp target/classes app.Main logs.txt synchronized 4 1000
+```
+
+### Concurrent processing with concurrent data structures
+
+```bash
+java -cp target/classes app.Main logs.txt concurrent 4 1000
+```
+
+For concurrent modes, the last two arguments specify:
+
+1. the number of worker threads;
+2. the capacity of the blocking queue.
+
+Both arguments are optional. If they are omitted, the application uses
+4 worker threads and a queue capacity of 1000.
+
+For example:
+
+```bash
+java -cp target/classes app.Main logs.txt concurrent
+```
+
+uses the default values.
+
+The input file must contain one log entry per line in the format described
+above.
+
 # Experiments
 
 Large log files are generated automatically using `LogGenerator`.
@@ -109,6 +157,7 @@ including thread-pool creation and shutdown.
 The isolated statistics benchmark starts measurement only after all worker
 threads are ready, in order to focus more closely on contention during
 statistics updates.
+
 ## Experiment 1: comparing single-thread and concurrent
 
 ### Concurrent analyzer

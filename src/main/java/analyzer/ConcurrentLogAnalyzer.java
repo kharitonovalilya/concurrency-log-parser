@@ -3,6 +3,7 @@ package analyzer;
 import model.LogEntry;
 import parser.LogParser;
 import statistics.StatisticsCollector;
+import statistics.ThreadSafeStatisticsCollector;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,7 +21,7 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
     private final int workerCount;
     private final int queueCapacity;
 
-    private final Supplier<StatisticsCollector> statisticsFactory;
+    private final Supplier<? ThreadSafeStatisticsCollector> statisticsFactory;
 
     private record QueueItem(String line, boolean flag) {
         static QueueItem log(String line) {
@@ -31,7 +32,7 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
         }
     }
 
-    public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<StatisticsCollector> statisticsFactory) {
+    public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<? ThreadSafeStatisticsCollector> statisticsFactory) {
         if (workerCount <= 0) {
             throw new IllegalArgumentException(
                     "workerCount must be positive"

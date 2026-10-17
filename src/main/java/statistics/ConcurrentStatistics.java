@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
 
-public class ConcurrentStatistics implements StatisticsCollector {
+public class ConcurrentStatistics implements ThreadSafeStatisticsCollector  {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
     private final LongAdder totalRequests = new LongAdder();
@@ -56,13 +56,13 @@ public class ConcurrentStatistics implements StatisticsCollector {
         return (double) totalResponseTime.sum() / requests;
     }
 
-    public Map<Integer, Integer> getStatusCounts() {
+    public Map<Integer, Long> getStatusCounts() {
         return statusCounts.entrySet().stream().
-                collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().intValue()));
+                collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().longValue()));
     }
 
-    public Map<String, Integer> getPathCounts() {
+    public Map<String, Long> getPathCounts() {
         return pathCounts.entrySet().stream().
-                collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().intValue()));
+                collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().longValue()));
     }
 }

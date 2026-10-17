@@ -17,7 +17,7 @@ public interface StatisticsCollector {
 
     double getAverageResponseTime();
 
-    Map<Integer, Integer> getStatusCounts();
+    Map<Integer, Long> getStatusCounts();
 
-    Map<String, Integer> getPathCounts();
+    Map<String, Long> getPathCounts();
 }

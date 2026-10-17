@@ -16,8 +16,8 @@ public class Statistics implements StatisticsCollector {
     private long totalResponseTime;
     private long maxResponseTime;
 
-    private final Map<Integer, Integer> statusCounts = new HashMap<>();
-    private final Map<String, Integer> pathCounts = new HashMap<>();
+    private final Map<Integer, Long> statusCounts = new HashMap<>();
+    private final Map<String, Long> pathCounts = new HashMap<>();
 
     @Override
     public void update(LogEntry log) {
@@ -28,8 +28,8 @@ public class Statistics implements StatisticsCollector {
         totalResponseTime += log.responseTimeMs();
         maxResponseTime = Math.max(maxResponseTime, log.responseTimeMs());
 
-        statusCounts.merge(log.statusCode(), 1, Integer::sum);
-        pathCounts.merge(log.path(), 1, Integer::sum);
+        statusCounts.merge(log.statusCode(), 1L, Long::sum);
+        pathCounts.merge(log.path(), 1L, Long::sum);
     }
 
     public double getAverageResponseTime() {
@@ -39,11 +39,11 @@ public class Statistics implements StatisticsCollector {
         return (double) totalResponseTime / totalRequests;
     }
 
-    public Map<Integer, Integer> getStatusCounts() {
+    public Map<Integer, Long> getStatusCounts() {
         return Collections.unmodifiableMap(statusCounts);
     }
 
-    public Map<String, Integer> getPathCounts() {
+    public Map<String, Long> getPathCounts() {
         return Collections.unmodifiableMap(pathCounts);
     }
 }

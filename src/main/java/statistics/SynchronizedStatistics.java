@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class SynchronizedStatistics implements StatisticsCollector {
+public class SynchronizedStatistics implements ThreadSafeStatisticsCollector {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
     private long totalRequests;
@@ -16,8 +16,8 @@ public class SynchronizedStatistics implements StatisticsCollector {
     private long totalResponseTime;
     private long maxResponseTime;
 
-    private final Map<Integer, Integer> statusCounts = new HashMap<>();
-    private final Map<String, Integer> pathCounts = new HashMap<>();
+    private final Map<Integer, Long> statusCounts = new HashMap<>();
+    private final Map<String, Long> pathCounts = new HashMap<>();
 
     @Override
     public synchronized void update(LogEntry log) {
@@ -28,8 +28,8 @@ public class SynchronizedStatistics implements StatisticsCollector {
         totalResponseTime += log.responseTimeMs();
         maxResponseTime = Math.max(maxResponseTime, log.responseTimeMs());
 
-        statusCounts.merge(log.statusCode(), 1, Integer::sum);
-        pathCounts.merge(log.path(), 1, Integer::sum);
+        statusCounts.merge(log.statusCode(), 1L, Long::sum);
+        pathCounts.merge(log.path(), 1L, Long::sum);
     }
 
     @Override
@@ -59,11 +59,11 @@ public class SynchronizedStatistics implements StatisticsCollector {
         return (double) totalResponseTime / totalRequests;
     }
 
-    public synchronized Map<Integer, Integer> getStatusCounts() {
+    public synchronized Map<Integer, Long> getStatusCounts() {
         return Collections.unmodifiableMap(statusCounts);
     }
 
-    public synchronized Map<String, Integer> getPathCounts() {
+    public synchronized Map<String, Long> getPathCounts() {
         return Collections.unmodifiableMap(pathCounts);
     }
 }
