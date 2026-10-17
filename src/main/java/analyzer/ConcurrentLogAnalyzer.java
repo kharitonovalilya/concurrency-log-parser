@@ -21,7 +21,7 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
     private final int workerCount;
     private final int queueCapacity;
 
-    private final Supplier<? ThreadSafeStatisticsCollector> statisticsFactory;
+    private final Supplier<? extends ThreadSafeStatisticsCollector> statisticsFactory;
 
     private record QueueItem(String line, boolean flag) {
         static QueueItem log(String line) {
@@ -32,7 +32,7 @@ public class ConcurrentLogAnalyzer implements LogAnalyzer {
         }
     }
 
-    public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<? ThreadSafeStatisticsCollector> statisticsFactory) {
+    public ConcurrentLogAnalyzer(LogParser logParser, int workerCount, int queueCapacity, Supplier<? extends ThreadSafeStatisticsCollector> statisticsFactory) {
         if (workerCount <= 0) {
             throw new IllegalArgumentException(
                     "workerCount must be positive"

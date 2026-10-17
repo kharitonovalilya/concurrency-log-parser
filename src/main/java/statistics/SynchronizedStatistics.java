@@ -1,7 +1,5 @@
 package statistics;
 
-import lombok.Getter;
-import lombok.Synchronized;
 import model.LogEntry;
 
 import java.util.Collections;

@@ -1,13 +1,11 @@
 package statistics;
 
-import lombok.Getter;
 import model.LogEntry;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-@Getter
 public class Statistics implements StatisticsCollector {
     private final static int ERROR_STATUS_THRESHOLD = 500;
 
@@ -30,6 +28,26 @@ public class Statistics implements StatisticsCollector {
 
         statusCounts.merge(log.statusCode(), 1L, Long::sum);
         pathCounts.merge(log.path(), 1L, Long::sum);
+    }
+
+    @Override
+    public long getTotalRequests() {
+        return totalRequests;
+    }
+
+    @Override
+    public long getErrorRequests() {
+        return errorRequests;
+    }
+
+    @Override
+    public long getTotalResponseTime() {
+        return totalResponseTime;
+    }
+
+    @Override
+    public long getMaxResponseTime() {
+        return maxResponseTime;
     }
 
     public double getAverageResponseTime() {
